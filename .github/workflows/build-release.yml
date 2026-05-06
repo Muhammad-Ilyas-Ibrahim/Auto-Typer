@@ -1,4 +1,4 @@
-name: Build & Release Typer Bot
+name: Build & Release Auto Typer
 
 on:
   push:
@@ -47,26 +47,26 @@ jobs:
             --hidden-import=PyQt5.sip ^
             --hidden-import=pyautogui ^
             --clean ^
-            --name="Typer Bot" ^
+            --name="Auto Typer" ^
             Typer.py
 
       - name: Rename EXE with Version
         run: |
-          Copy-Item "dist\Typer Bot.exe" "dist\Typer Bot v${{ env.VERSION }}.exe"
+          Copy-Item "dist\Auto Typer.exe" "dist\Auto Typer v${{ env.VERSION }}.exe"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Typer-Bot-EXE
-          path: dist/Typer Bot v${{ env.VERSION }}.exe
+          path: dist/Auto Typer v${{ env.VERSION }}.exe
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
-          files: dist/Typer Bot v${{ env.VERSION }}.exe
+          files: dist/Auto Typer v${{ env.VERSION }}.exe
           tag_name: v${{ env.VERSION }}
-          name: Typer Bot v${{ env.VERSION }}
+          name: Auto Typer v${{ env.VERSION }}
           draft: false
           prerelease: false
           generate_release_notes: true
