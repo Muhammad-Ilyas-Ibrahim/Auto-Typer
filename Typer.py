@@ -5,7 +5,8 @@ import os
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QTextEdit, QPushButton, QSpinBox, QSlider, QGroupBox, QFrame
+    QLabel, QTextEdit, QPushButton, QSpinBox, QSlider, QGroupBox, QFrame,
+    QCheckBox, QSizePolicy
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from PyQt5.QtGui import QFont, QIcon
@@ -170,6 +171,8 @@ class AutoTyper(QMainWindow):
         self.speed_slider = QSlider(Qt.Horizontal)
         self.speed_slider.setRange(1, 200)
         self.speed_slider.setValue(45)
+        self.speed_slider.setMinimumWidth(220)
+        self.speed_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.speed_slider.valueChanged.connect(self.update_speed_label)
         self.speed_label = QLabel("Fast")
         l3.addWidget(QLabel("Char Speed:"))
@@ -178,6 +181,18 @@ class AutoTyper(QMainWindow):
         controls.addWidget(g3)
         
         main.addLayout(controls)
+        
+        options_layout = QHBoxLayout()
+        options_layout.setSpacing(16)
+        g4 = QGroupBox("Newline Behavior")
+        l4 = QHBoxLayout(g4)
+        l4.setContentsMargins(15, 15, 15, 15)
+        self.smart_newline_checkbox = QCheckBox("Fix editor auto-indent on newline")
+        self.smart_newline_checkbox.setChecked(True)
+        l4.addWidget(self.smart_newline_checkbox)
+        l4.addStretch()
+        options_layout.addWidget(g4)
+        main.addLayout(options_layout)
         
         # Countdown
         self.countdown_label = QLabel("Ready")
@@ -212,7 +227,7 @@ class AutoTyper(QMainWindow):
         main.addWidget(self.status_label)
         
         # Tip
-        tip = QLabel("Tip: Switch to target window after pressing Start. Move mouse to top-left corner for emergency stop.")
+        tip = QLabel("Tip: Switch to target window after pressing Start. Enable the newline fix option for editor auto-indent handling.")
         tip.setWordWrap(True)
         tip.setStyleSheet("color: #9399b2; font-size: 13px;")
         main.addWidget(tip)
@@ -261,26 +276,99 @@ class AutoTyper(QMainWindow):
         
         self.signals.countdown_update.emit(0)
         text = self.text_edit.toPlainText()
-        char_interval = self.speed_slider.value() / 1000.0
-        
-        try:
-            for char in text:
-                if self.stop_flag:
-                    break
-                if char == '\n':
-                    pyautogui.press('enter')
-                    if line_delay > 0:
-                        time.sleep(line_delay)
-                elif char == '\t':
-                    pyautogui.press('tab')
-                else:
-                    pyautogui.typewrite(char)
-                time.sleep(char_interval)
-        except:
-            pass
-        
+        self._type_text_block(text, line_delay)
         self.signals.typing_finished.emit()
+
+
+    def get_indent_level(self, line: str) -> int:
+        """
+        Converts indentation into logical levels.
+        Assumes:
+        - 1 tab = 1 level
+        - 4 spaces = 1 level
+        """
+        space_count = 0
+        level = 0
+
+        for ch in line:
+            if ch == '\t':
+                level += 1
+            elif ch == ' ':
+                space_count += 1
+                if space_count == 4:
+                    level += 1
+                    space_count = 0
+            else:
+                break
+        return level
     
+
+    def apply_indent(self, level: int):
+        """
+        Always uses tabs for indentation.
+        """
+        for _ in range(level):
+            pyautogui.press('tab')
+
+    def _type_text_block(self, text, line_delay):
+        char_interval = self.speed_slider.value() / 1000.0
+        lines = text.splitlines()
+
+        for i in range(len(lines)):
+            if self.stop_flag:
+                return
+
+            current_line = lines[i]
+            next_line = lines[i + 1] if i + 1 < len(lines) else ""
+
+            current_level = self.get_indent_level(current_line)
+            next_level = self.get_indent_level(next_line)
+
+            stripped = current_line.lstrip(' \t')
+
+            # STEP 1: type current line (NO indentation here)
+            for ch in stripped:
+                if self.stop_flag:
+                    return
+                pyautogui.write(ch)
+                time.sleep(char_interval)
+
+            # STEP 2: move to next line
+            if i < len(lines) - 1:
+                pyautogui.press('enter')
+
+                # STEP 3: adjust indentation AFTER enter ONLY
+                diff = next_level - current_level
+
+                if diff > 0:
+                    for _ in range(diff):
+                        pyautogui.press('tab')
+
+                elif diff < 0:
+                    for _ in range(abs(diff)):
+                        pyautogui.press('backspace')
+
+                if line_delay > 0:
+                    time.sleep(line_delay)
+
+    def _get_prev_line_indent(self, text, index):
+        j = index - 1
+        while j >= 0 and text[j] != '\n':
+            j -= 1
+        line_start = j + 1
+        indent = 0
+        while line_start < index and text[line_start] in (' ', '\t'):
+            indent += 1
+            line_start += 1
+        return indent
+
+    def _get_next_line_indent(self, text, index):
+        indent = 0
+        while index < len(text) and text[index] in (' ', '\t'):
+            indent += 1
+            index += 1
+        return indent
+
     def stop_typing(self):
         self.stop_flag = True
         self.status_label.setText("Status: Stopping...")
