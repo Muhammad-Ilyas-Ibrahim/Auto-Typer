@@ -98,6 +98,11 @@ class AutoTyper(QMainWindow):
                 background-color: #f38ba8;
                 color: #1e1e2e;
             }
+            QCheckBox {
+                color: #cdd6f4;
+                font-size: 12px;
+                spacing: 10px;
+            }
         """)
         
         self.signals = Signals()
