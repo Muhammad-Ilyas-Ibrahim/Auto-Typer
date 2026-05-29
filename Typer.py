@@ -12,7 +12,6 @@ from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from PyQt5.QtGui import QFont, QIcon
 import pyautogui
 
-
 class Signals(QObject):
     countdown_update = pyqtSignal(int)
     typing_finished = pyqtSignal()
